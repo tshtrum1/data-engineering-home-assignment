@@ -1,11 +1,8 @@
 from pyspark.sql import SparkSession
 
 # Initialize Spark session
-spark = SparkSession.builder.appName("TopThreeTickerAndDate").getOrCreate()
-
-"""
 spark = SparkSession.builder \
-    .appName("StocksAverageReturn") \
+    .appName("TopThreeTickerAndDate") \
     .config("spark.hadoop.fs.s3a.access.key", "YOUR_AWS_ACCESS_KEY") \
     .config("spark.hadoop.fs.s3a.secret.key", "YOUR_AWS_SECRET_KEY") \
     .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \
@@ -13,12 +10,8 @@ spark = SparkSession.builder \
     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
     .getOrCreate()
 
-# Specify the S3 path to the CSV file
-s3_path = "s3a://your-bucket-name/path/to/your-file.csv"
-"""
-
-# Load CSV data (Spark infers the schema automatically)
-df = spark.read.csv("/Users/tomershtrum/Desktop/intellij/data-engineering-home-assignment/stocks_data.csv", header=True)
+# Load CSV data
+df = spark.read.csv("s3://data-engineer-assignment-tomersht/input/stocks_data.csv", header=True)
 # Register as temp table for SQL queries
 df.createOrReplaceTempView("stocks_data")
 
@@ -63,9 +56,8 @@ returns_df.createOrReplaceTempView("returns_data")
 # Step 4: Rank the results by return_30_day and select the top 3 returns
 query_top_returns = """
 SELECT 
-    current_date,
     ticker,
-    return_30_day
+    current_date AS date
 FROM (
     SELECT 
         current_date,
@@ -78,11 +70,8 @@ WHERE rank <= 3
 """
 
 # Execute the SQL query to get top 3 returns
-top_returns_df = spark.sql(query_top_returns)
+result_df = spark.sql(query_top_returns)
 
-# Show the final result
-top_returns_df.show()
-
-#top_returns_df.write.parquet("s3a://<your-bucket-name>/path/to/save/final_data.parquet")
+result_df.write.parquet("s3://data-engineer-assignment-tomersht/output/top-three-ticker-and-date")
 
 spark.stop()

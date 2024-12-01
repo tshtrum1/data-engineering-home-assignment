@@ -1,11 +1,8 @@
 from pyspark.sql import SparkSession
 
 # Initialize Spark session
-spark = SparkSession.builder.appName("StockMostVolatile").getOrCreate()
-
-"""
 spark = SparkSession.builder \
-    .appName("StocksAverageReturn") \
+    .appName("StockMostVolatile") \
     .config("spark.hadoop.fs.s3a.access.key", "YOUR_AWS_ACCESS_KEY") \
     .config("spark.hadoop.fs.s3a.secret.key", "YOUR_AWS_SECRET_KEY") \
     .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com") \
@@ -13,11 +10,8 @@ spark = SparkSession.builder \
     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
     .getOrCreate()
 
-# Specify the S3 path to the CSV file
-s3_path = "s3a://your-bucket-name/path/to/your-file.csv"
-"""
-
-df = spark.read.csv("/Users/tomershtrum/Desktop/intellij/data-engineering-home-assignment/stocks_data.csv", header=True)
+# Load CSV data
+df = spark.read.csv("s3://data-engineer-assignment-tomersht/input/stocks_data.csv", header=True)
 df.createOrReplaceTempView("stocks_data")
 
 # Step 1: Fill missing closing prices
@@ -62,17 +56,15 @@ GROUP BY ticker
 volatility_df.createOrReplaceTempView("volatility_table")
 
 # Step 4: Find the most volatile stock
-most_volatile_df = spark.sql("""
+result_df = spark.sql("""
 SELECT
     ticker,
-    annualized_volatility
+    annualized_volatility AS standard_deviation
 FROM volatility_table
 ORDER BY annualized_volatility DESC
 LIMIT 1
 """)
 
-most_volatile_df.show()
-
-#most_volatile_df.write.parquet("s3a://<your-bucket-name>/path/to/save/final_data.parquet")
+result_df.write.parquet("s3://data-engineer-assignment-tomersht/output/stock-most-volatile")
 
 spark.stop()

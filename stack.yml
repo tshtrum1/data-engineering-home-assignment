@@ -1,48 +1,276 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: CloudFormation template to create a Lambda function that prints "Hello, World!".
+Description: CloudFormation template to deploy AWS Glue resources for PySpark jobs.
 
 Resources:
-    LambdaExecutionRole:
-        Type: "AWS::IAM::Role"
+    # Glue Catalog Database
+    GlueCatalogDatabase:
+        Type: "AWS::Glue::Database"
+        Properties:
+            CatalogId: !Ref "AWS::AccountId"
+            DatabaseInput:
+                Name: "pyspark_tomersht_db"
+
+    # Glue Execution Role
+    GlueExecutionRole:
+        Type: AWS::IAM::Role
         Properties:
             AssumeRolePolicyDocument:
                 Version: "2012-10-17"
                 Statement:
-                    - Effect: "Allow"
+                    - Effect: Allow
                       Principal:
                           Service:
-                              - "lambda.amazonaws.com"
-                      Action: "sts:AssumeRole"
+                              - glue.amazonaws.com
+                      Action: sts:AssumeRole
             Policies:
-                - PolicyName: "LambdaExecutionPolicy"
+                - PolicyName: GlueS3AccessPolicy
                   PolicyDocument:
                       Version: "2012-10-17"
                       Statement:
-                          - Effect: "Allow"
+                          - Effect: Allow
                             Action:
-                                - "logs:CreateLogGroup"
-                                - "logs:CreateLogStream"
-                                - "logs:PutLogEvents"
-                            Resource: "arn:aws:logs:*:*:*"
+                                - s3:ListBucket
+                            Resource:
+                                - "arn:aws:s3:::data-engineer-assignment-tomersht"
+                          - Effect: Allow
+                            Action:
+                                - s3:GetObject
+                                - s3:PutObject
+                            Resource:
+                                - "arn:aws:s3:::data-engineer-assignment-tomersht/*"
 
-    HelloWorldLambda:
-        Type: "AWS::Lambda::Function"
+    # Glue Jobs
+    PySparkTomershtStocksAverageReturn:
+        Type: "AWS::Glue::Job"
         Properties:
-            FunctionName: "HelloWorldFunction"
-            Handler: "index.handler"
-            Role: !GetAtt LambdaExecutionRole.Arn
-            Runtime: "python3.9"
-            Code:
-                ZipFile: |
-                    def handler(event, context):
-                        print("Hello, World!")
-            Timeout: 30
-            MemorySize: 128
+            Name: "tomersht-stocks-average-return"
+            Role: !GetAtt GlueExecutionRole.Arn
+            Command:
+                Name: "glueetl"
+                ScriptLocation: "s3://data-engineer-assignment-tomersht/scripts/stocks-average-return.py"
+                PythonVersion: "3"
+            MaxRetries: 1
+            WorkerType: "G.1X"
+            NumberOfWorkers: 10
+
+    PySparkTomershtStockHighesWorth:
+        Type: "AWS::Glue::Job"
+        Properties:
+            Name: "tomersht-stock-highes-worth"
+            Role: !GetAtt GlueExecutionRole.Arn
+            Command:
+                Name: "glueetl"
+                ScriptLocation: "s3://data-engineer-assignment-tomersht/scripts/stock-highes-worth.py"
+                PythonVersion: "3"
+            MaxRetries: 1
+            WorkerType: "G.1X"
+            NumberOfWorkers: 10
+
+    PySparkTomershtStockMostVolatile:
+        Type: "AWS::Glue::Job"
+        Properties:
+            Name: "tomersht-stock-most-volatile"
+            Role: !GetAtt GlueExecutionRole.Arn
+            Command:
+                Name: "glueetl"
+                ScriptLocation: "s3://data-engineer-assignment-tomersht/scripts/stock-most-volatile.py"
+                PythonVersion: "3"
+            MaxRetries: 1
+            WorkerType: "G.1X"
+            NumberOfWorkers: 10
+
+    PySparkTomershtTopThreeTickerAndDate:
+        Type: "AWS::Glue::Job"
+        Properties:
+            Name: "tomersht-top-three-ticker-and-date"
+            Role: !GetAtt GlueExecutionRole.Arn
+            Command:
+                Name: "glueetl"
+                ScriptLocation: "s3://data-engineer-assignment-tomersht/scripts/top-three-ticker-and-date.py"
+                PythonVersion: "3"
+            MaxRetries: 1
+            WorkerType: "G.1X"
+            NumberOfWorkers: 10
+
+    # Glue Tables
+    TableTomershtStocksAverageReturn:
+        Type: "AWS::Glue::Table"
+        Properties:
+            DatabaseName: !Ref GlueCatalogDatabase
+            CatalogId: !Ref "AWS::AccountId"
+            TableInput:
+                Name: "stocks-average-return"
+                StorageDescriptor:
+                    Columns:
+                        - Name: "date"
+                          Type: "string"
+                        - Name: "average_return"
+                          Type: "double"
+                    Location: "s3://data-engineer-assignment-tomersht/output/stocks-average-return/"
+                    InputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+                    OutputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+                    Compressed: true
+                    SerdeInfo:
+                        SerializationLibrary: "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                    NumberOfBuckets: -1
+
+    TableTomershtStockHighesWorth:
+        Type: "AWS::Glue::Table"
+        Properties:
+            DatabaseName: !Ref GlueCatalogDatabase
+            CatalogId: !Ref "AWS::AccountId"
+            TableInput:
+                Name: "stock-highes-worth"
+                StorageDescriptor:
+                    Columns:
+                        - Name: "ticker"
+                          Type: "string"
+                        - Name: "value"
+                          Type: "double"
+                    Location: "s3://data-engineer-assignment-tomersht/output/stock-highes-worth/"
+                    InputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+                    OutputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+                    Compressed: true
+                    SerdeInfo:
+                        SerializationLibrary: "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                    NumberOfBuckets: -1
+
+    TableTomershtStockMostVolatile:
+        Type: "AWS::Glue::Table"
+        Properties:
+            DatabaseName: !Ref GlueCatalogDatabase
+            CatalogId: !Ref "AWS::AccountId"
+            TableInput:
+                Name: "stock-most-volatile"
+                StorageDescriptor:
+                    Columns:
+                        - Name: "ticker"
+                          Type: "string"
+                        - Name: "standard_deviation"
+                          Type: "double"
+                    Location: "s3://data-engineer-assignment-tomersht/output/stock-most-volatile/"
+                    InputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+                    OutputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+                    Compressed: true
+                    SerdeInfo:
+                        SerializationLibrary: "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                    NumberOfBuckets: -1
+
+    TableTomershtTopThreeTickerAndDate:
+        Type: "AWS::Glue::Table"
+        Properties:
+            DatabaseName: !Ref GlueCatalogDatabase
+            CatalogId: !Ref "AWS::AccountId"
+            TableInput:
+                Name: "top-three-ticker-and-date"
+                StorageDescriptor:
+                    Columns:
+                        - Name: "ticker"
+                          Type: "string"
+                        - Name: "date"
+                          Type: "string"
+                    Location: "s3://data-engineer-assignment-tomersht/output/top-three-ticker-and-date/"
+                    InputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+                    OutputFormat: "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+                    Compressed: true
+                    SerdeInfo:
+                        SerializationLibrary: "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+                    NumberOfBuckets: -1
+
+    # Glue Crawlers
+    CrawlerTomershtStocksAverageReturn:
+        Type: "AWS::Glue::Crawler"
+        Properties:
+            Name: "stocks-average-return_crawler"
+            Role: !GetAtt GlueExecutionRole.Arn
+            DatabaseName: !Ref GlueCatalogDatabase
+            Targets:
+                S3Targets:
+                    - Path: "s3://data-engineer-assignment-tomersht/output/stocks-average-return/"
+
+    CrawlerTomershtStockHighesWorth:
+        Type: "AWS::Glue::Crawler"
+        Properties:
+            Name: "stock-highes-worth_crawler"
+            Role: !GetAtt GlueExecutionRole.Arn
+            DatabaseName: !Ref GlueCatalogDatabase
+            Targets:
+                S3Targets:
+                    - Path: "s3://data-engineer-assignment-tomersht/output/stock-highes-worth/"
+
+    CrawlerTomershtStockMostVolatile:
+        Type: "AWS::Glue::Crawler"
+        Properties:
+            Name: "stock-most-volatile_crawler" # Replace with your crawler name
+            Role: !GetAtt GlueExecutionRole.Arn
+            DatabaseName: !Ref GlueCatalogDatabase
+            Targets:
+                S3Targets:
+                    - Path: "s3://data-engineer-assignment-tomersht/output/stock-most-volatile/"
+
+    CrawlerTomershtTopThreeTickerAndDate:
+        Type: "AWS::Glue::Crawler"
+        Properties:
+            Name: "top-three-ticker-and-date_crawler" # Replace with your crawler name
+            Role: !GetAtt GlueExecutionRole.Arn
+            DatabaseName: !Ref GlueCatalogDatabase
+            Targets:
+                S3Targets:
+                    - Path: "s3://data-engineer-assignment-tomersht/output/top-three-ticker-and-date/"
 
 Outputs:
-    LambdaFunctionName:
-        Description: "Name of the Lambda function created"
-        Value: !Ref HelloWorldLambda
-    LambdaExecutionRoleArn:
-        Description: "ARN of the Lambda execution role"
-        Value: !GetAtt LambdaExecutionRole.Arn
+    GlueCatalogDatabaseName:
+        Description: "Name of the Glue Catalog Database"
+        Value: !Ref GlueCatalogDatabase
+
+    GlueExecutionRoleArn:
+        Description: "ARN of the Glue Execution Role"
+        Value: !GetAtt GlueExecutionRole.Arn
+
+    PySparkJob1Name:
+        Description: "Name of the PySpark Glue Job for Stocks Average Return"
+        Value: !Ref PySparkTomershtStocksAverageReturn
+
+    PySparkJob2Name:
+        Description: "Name of the PySpark Glue Job for Stock Highest Worth"
+        Value: !Ref PySparkTomershtStockHighesWorth
+
+    PySparkJob3Name:
+        Description: "Name of the PySpark Glue Job for Stock Most Volatile"
+        Value: !Ref PySparkTomershtStockMostVolatile
+
+    PySparkJob4Name:
+        Description: "Name of the PySpark Glue Job for Top Three Ticker and Date"
+        Value: !Ref PySparkTomershtTopThreeTickerAndDate
+
+    GlueTableStocksAverageReturn:
+        Description: "Glue Table for Stocks Average Return"
+        Value: !Ref TableTomershtStocksAverageReturn
+
+    GlueTableStockHighesWorth:
+        Description: "Glue Table for Stock Highest Worth"
+        Value: !Ref TableTomershtStockHighesWorth
+
+    GlueTableStockMostVolatile:
+        Description: "Glue Table for Stock Most Volatile"
+        Value: !Ref TableTomershtStockMostVolatile
+
+    GlueTableTopThreeTickerAndDate:
+        Description: "Glue Table for Top Three Ticker and Date"
+        Value: !Ref TableTomershtTopThreeTickerAndDate
+
+    CrawlerStocksAverageReturnName:
+        Description: "Name of the Glue Crawler for Stocks Average Return"
+        Value: !Ref CrawlerTomershtStocksAverageReturn
+
+    CrawlerStockHighesWorthName:
+        Description: "Name of the Glue Crawler for Stock Highest Worth"
+        Value: !Ref CrawlerTomershtStockHighesWorth
+
+    CrawlerStockMostVolatileName:
+        Description: "Name of the Glue Crawler for Stock Most Volatile"
+        Value: !Ref CrawlerTomershtStockMostVolatile
+
+    CrawlerTopThreeTickerAndDateName:
+        Description: "Name of the Glue Crawler for Top Three Ticker and Date"
+        Value: !Ref CrawlerTomershtTopThreeTickerAndDate

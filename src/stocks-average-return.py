@@ -1,8 +1,6 @@
 from pyspark.sql import SparkSession
 
 # Initialize Spark session
-spark = SparkSession.builder.appName("StocksAverageReturn").getOrCreate()
-"""
 spark = SparkSession.builder \
     .appName("StocksAverageReturn") \
     .config("spark.hadoop.fs.s3a.access.key", "YOUR_AWS_ACCESS_KEY") \
@@ -12,12 +10,8 @@ spark = SparkSession.builder \
     .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
     .getOrCreate()
 
-# Specify the S3 path to the CSV file
-s3_path = "s3a://your-bucket-name/path/to/your-file.csv"
-"""
-
 # Load CSV data
-df = spark.read.csv("/Users/tomershtrum/Desktop/intellij/data-engineering-home-assignment/stocks_data.csv", header=True)
+df = spark.read.csv("s3://data-engineer-assignment-tomersht/input/stocks_data.csv", header=True)
 df.createOrReplaceTempView("stocks_data")
 
 # Step 1: Find the closest dates using self-join and compute the date difference
@@ -81,8 +75,6 @@ GROUP BY current_date
 ORDER BY current_date ASC
 """)
 
-result_df.show()
-
-#result_df.write.parquet("s3a://<your-bucket-name>/path/to/save/final_data.parquet")
+result_df.write.parquet("s3://data-engineer-assignment-tomersht/output/stocks-average-return")
 
 spark.stop()
